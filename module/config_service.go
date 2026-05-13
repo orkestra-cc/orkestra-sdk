@@ -8,9 +8,6 @@ import (
 	"os"
 	"strings"
 	"time"
-
-	"github.com/orkestra/backend/internal/shared/database"
-	"github.com/orkestra/backend/internal/shared/utils"
 )
 
 // profileAddons maps SKU profile names (set via the ORKESTRA_PROFILE env var
@@ -38,7 +35,7 @@ var profileAddons = map[string][]string{
 // It provides the hot-path IsEnabled() check used by the ModuleGate middleware.
 type ModuleConfigService struct {
 	repo        *ModuleConfigRepository
-	redis       *database.RedisClientAdapter
+	redis       RedisClient
 	logger      *slog.Logger
 	coreModules map[string]bool // precomputed set — never hits DB/Redis
 
@@ -55,7 +52,7 @@ const (
 )
 
 // NewModuleConfigService creates a new config service.
-func NewModuleConfigService(repo *ModuleConfigRepository, redis *database.RedisClientAdapter, logger *slog.Logger) *ModuleConfigService {
+func NewModuleConfigService(repo *ModuleConfigRepository, redis RedisClient, logger *slog.Logger) *ModuleConfigService {
 	return &ModuleConfigService{
 		repo:         repo,
 		redis:        redis,
@@ -269,7 +266,7 @@ func (s *ModuleConfigService) buildInitialConfig(m Module, profileOverride map[s
 		}
 
 		if field.Type == FieldSecret {
-			encrypted, err := utils.EncryptOAuthToken(value)
+			encrypted, err := encryptSecret(value)
 			if err != nil {
 				s.logger.Warn("SeedFromModules: failed to encrypt secret, storing empty",
 					slog.String("module", m.Name()),
@@ -441,7 +438,7 @@ func (s *ModuleConfigService) lazySeed(ctx context.Context, name string) (*Modul
 func (s *ModuleConfigService) UpdateConfig(ctx context.Context, name string, values map[string]string, secrets map[string]string) error {
 	encrypted := make(map[string]string, len(secrets))
 	for k, v := range secrets {
-		enc, err := utils.EncryptOAuthToken(v)
+		enc, err := encryptSecret(v)
 		if err != nil {
 			return fmt.Errorf("encrypt secret %q: %w", k, err)
 		}
@@ -498,7 +495,7 @@ func (s *ModuleConfigService) UpdateEnvironmentConfig(ctx context.Context, name,
 		mergedEncrypted = make(map[string]string)
 	}
 	for k, v := range secrets {
-		enc, err := utils.EncryptOAuthToken(v)
+		enc, err := encryptSecret(v)
 		if err != nil {
 			return fmt.Errorf("encrypt secret %q: %w", k, err)
 		}
@@ -634,7 +631,7 @@ func (s *ModuleConfigService) GetSecret(ctx context.Context, moduleName, key str
 	// Prefer active environment encrypted values.
 	encryptedValues := doc.ActiveEncryptedValues()
 	if enc, ok := encryptedValues[key]; ok && enc != "" {
-		decrypted, err := utils.DecryptOAuthToken(enc)
+		decrypted, err := decryptSecret(enc)
 		if err != nil {
 			s.logger.Warn("GetSecret: failed to decrypt, falling back to env",
 				slog.String("module", moduleName), slog.String("key", key))

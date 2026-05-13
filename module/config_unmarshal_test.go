@@ -5,12 +5,10 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/orkestra/backend/internal/shared/utils"
 )
 
 // testEncryptionKey is a deterministic 32-byte hex string used by the secret
-// fields tests. utils.EncryptOAuthToken/DecryptOAuthToken read the key from
+// fields tests. encryptSecret/DecryptOAuthToken read the key from
 // OAUTH_TOKEN_ENCRYPTION_KEY at call time.
 const testEncryptionKey = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
@@ -45,7 +43,7 @@ func TestUnmarshalModule_AllFieldTypes(t *testing.T) {
 		{Key: "logLevel", Type: FieldEnum, Options: []string{"debug", "info", "warn"}},
 		{Key: "tags", Type: FieldStringList},
 	}
-	enc, err := utils.EncryptOAuthToken("hunter2")
+	enc, err := encryptSecret("hunter2")
 	if err != nil {
 		t.Fatalf("encrypt setup: %v", err)
 	}
@@ -106,7 +104,7 @@ func TestUnmarshalModule_AllFieldTypes(t *testing.T) {
 
 func TestUnmarshalModule_SecretDecryption(t *testing.T) {
 	withEncryptionKey(t)
-	enc, err := utils.EncryptOAuthToken("super-secret-token")
+	enc, err := encryptSecret("super-secret-token")
 	if err != nil {
 		t.Fatalf("encrypt setup: %v", err)
 	}

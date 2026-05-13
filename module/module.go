@@ -9,8 +9,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/go-chi/chi/v5"
-	"github.com/orkestra/backend/internal/shared/config"
-	"github.com/orkestra/backend/internal/shared/database"
 	"github.com/orkestra/backend/pkg/sdk/capability"
 	"github.com/orkestra/backend/pkg/sdk/iface"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -460,14 +458,18 @@ type PlatformInfo interface {
 // Dependencies holds shared infrastructure injected into every module.
 type Dependencies struct {
 	DB           *mongo.Database
-	RedisAdapter *database.RedisClientAdapter
-	// Config is the legacy *config.Config handle. New code should use
-	// Platform for environment + frontend URL info and ConfigService /
-	// UnmarshalModule for per-module values. Auth core still reads from
-	// this field heavily and is retired in Phase 1c.
+	RedisAdapter RedisClient
+	// Config is the legacy app-wide configuration handle. New code should
+	// use Platform for environment + frontend URL info and ConfigService /
+	// UnmarshalModule for per-module values. Auth core still type-asserts
+	// this field to *config.Config and is retired in Phase 1c.
+	//
+	// Typed as `any` so the SDK module package has no import of any
+	// backend-internal struct — extracted addons can ignore the field
+	// entirely and the SDK stays publishable.
 	//
 	// Deprecated: use Platform + ConfigService instead.
-	Config        *config.Config
+	Config        any
 	Platform      PlatformInfo
 	Logger        *slog.Logger
 	Services      *ServiceRegistry

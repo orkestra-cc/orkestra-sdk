@@ -9,8 +9,6 @@ import (
 	"strings"
 	"time"
 	"unicode"
-
-	"github.com/orkestra/backend/internal/shared/utils"
 )
 
 // UnmarshalModule decodes the active-environment configuration of moduleName
@@ -28,7 +26,7 @@ import (
 //     zero value (no error). This matches the silent-default behaviour of the
 //     existing GetValue helpers.
 //
-// FieldSecret values are decrypted via utils.DecryptOAuthToken (AES-256-GCM,
+// FieldSecret values are decrypted via decryptSecret (AES-256-GCM,
 // same path as GetSecret). A decryption failure surfaces as an error.
 //
 // Type compatibility between Go struct field and schema field type:
@@ -141,7 +139,7 @@ func schemaKeyForField(sf reflect.StructField) string {
 func resolveValue(field ConfigField, values, encrypted map[string]string) (string, error) {
 	if field.Type == FieldSecret {
 		if enc, ok := encrypted[field.Key]; ok && enc != "" {
-			plain, err := utils.DecryptOAuthToken(enc)
+			plain, err := decryptSecret(enc)
 			if err != nil {
 				return "", fmt.Errorf("decrypt secret: %w", err)
 			}

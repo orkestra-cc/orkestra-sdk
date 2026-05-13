@@ -20,12 +20,23 @@ package tenantrepo
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 
-	"github.com/orkestra/backend/internal/shared/errors"
 	"github.com/orkestra/backend/pkg/sdk/ctxauth"
 	"go.mongodb.org/mongo-driver/bson"
 )
+
+// ErrTenantScopeMissing is returned when a tenant-scoped operation runs in
+// a request that has no resolved tenant (typically because the route is
+// missing its RequireAuth chain).
+var ErrTenantScopeMissing = errors.New("tenant scope missing")
+
+// ErrTenantKindMismatch wraps a tenant-tier check failure. Use errors.Is
+// to test for it; the wrapped message names the expected tier and the
+// actual tier.
+var ErrTenantKindMismatch = errors.New("tenant kind mismatch")
 
 // TenantIDField is the canonical BSON field name used to store the owning
 // tenant on every tenant-scoped document.
@@ -42,9 +53,7 @@ func Scope(ctx context.Context, filter bson.M) (bson.M, error) {
 		if isDev() {
 			panic("tenantrepo.Scope: context has no tenantID — caller forgot to scope this query")
 		}
-		return nil, errors.AuthorizationError("tenant scope missing").
-			WithOperation("tenantrepo.Scope").
-			Build()
+		return nil, fmt.Errorf("%w (tenantrepo.Scope)", ErrTenantScopeMissing)
 	}
 	if filter == nil {
 		filter = bson.M{}
@@ -74,8 +83,7 @@ func StampInsert(ctx context.Context) (string, error) {
 		if isDev() {
 			panic("tenantrepo.StampInsert: context has no tenantID")
 		}
-		return "", errors.AuthorizationError("tenant scope missing").
-			WithOperation("tenantrepo.StampInsert").Build()
+		return "", fmt.Errorf("%w (tenantrepo.StampInsert)", ErrTenantScopeMissing)
 	}
 	return tenantID, nil
 }
@@ -102,8 +110,7 @@ func ScopeAggregate(ctx context.Context, pipeline []bson.M) ([]bson.M, error) {
 		if isDev() {
 			panic("tenantrepo.ScopeAggregate: context has no tenantID")
 		}
-		return nil, errors.AuthorizationError("tenant scope missing").
-			WithOperation("tenantrepo.ScopeAggregate").Build()
+		return nil, fmt.Errorf("%w (tenantrepo.ScopeAggregate)", ErrTenantScopeMissing)
 	}
 	match := bson.M{"$match": bson.M{TenantIDField: tenantID}}
 	out := make([]bson.M, 0, len(pipeline)+1)
@@ -141,14 +148,10 @@ func RequireInternalTenant(ctx context.Context) error {
 		if isDev() {
 			panic("tenantrepo.RequireInternalTenant: tenant kind missing — route not gated by RequireAuth?")
 		}
-		return errors.AuthorizationError("tenant kind missing").
-			WithOperation("tenantrepo.RequireInternalTenant").Build()
+		return fmt.Errorf("%w: kind unset (tenantrepo.RequireInternalTenant)", ErrTenantScopeMissing)
 	}
 	if kind != "internal" {
-		return errors.AuthorizationError("this operation is restricted to internal tenants").
-			WithOperation("tenantrepo.RequireInternalTenant").
-			WithDetail("tenant_kind", kind).
-			Build()
+		return fmt.Errorf("%w: want internal, got %q", ErrTenantKindMismatch, kind)
 	}
 	return nil
 }
@@ -161,14 +164,10 @@ func RequireExternalTenant(ctx context.Context) error {
 		if isDev() {
 			panic("tenantrepo.RequireExternalTenant: tenant kind missing — route not gated by RequireAuth?")
 		}
-		return errors.AuthorizationError("tenant kind missing").
-			WithOperation("tenantrepo.RequireExternalTenant").Build()
+		return fmt.Errorf("%w: kind unset (tenantrepo.RequireExternalTenant)", ErrTenantScopeMissing)
 	}
 	if kind != "external" {
-		return errors.AuthorizationError("this operation is restricted to external tenants").
-			WithOperation("tenantrepo.RequireExternalTenant").
-			WithDetail("tenant_kind", kind).
-			Build()
+		return fmt.Errorf("%w: want external, got %q", ErrTenantKindMismatch, kind)
 	}
 	return nil
 }
