@@ -13,9 +13,12 @@ module github.com/orkestra-cc/orkestra-sdk
 ```
 
 Bound to `backend/` via the repo-root `go.work` plus a `replace` directive
-in `backend/go.mod`. Phase 4 of the SDK split publishes this same tree to
-its own GitHub repo (`orkestra-cc/orkestra-sdk`); the import path is
-chosen so that move is a no-op for every consumer.
+in `backend/go.mod` pointing at this in-tree path. The same tree is
+mirrored to [github.com/orkestra-cc/orkestra-sdk](https://github.com/orkestra-cc/orkestra-sdk)
+(published since `v0.1.0`); external addons fetch the public version
+through the Go module proxy, monorepo development uses the live source
+here. When cross-cutting churn ends, the `replace` will drop and
+backend becomes a regular module consumer.
 
 For the conceptual / new-developer walkthrough see
 [../../../docs/onboarding/orkestra-sdk.md](../../../docs/onboarding/orkestra-sdk.md).
