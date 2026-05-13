@@ -23,7 +23,7 @@ import (
 	"os"
 
 	"github.com/orkestra/backend/internal/shared/errors"
-	"github.com/orkestra/backend/internal/shared/middleware"
+	"github.com/orkestra/backend/pkg/sdk/ctxauth"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -37,7 +37,7 @@ const TenantIDField = "tenantId"
 // bugs surface loudly during development instead of silently exposing data
 // in production.
 func Scope(ctx context.Context, filter bson.M) (bson.M, error) {
-	tenantID, ok := middleware.GetTenantID(ctx)
+	tenantID, ok := ctxauth.GetTenantID(ctx)
 	if !ok || tenantID == "" {
 		if isDev() {
 			panic("tenantrepo.Scope: context has no tenantID — caller forgot to scope this query")
@@ -69,7 +69,7 @@ func MustScope(ctx context.Context, filter bson.M) bson.M {
 // the tenantId field themselves — StampInsert returns the tenantID so they
 // can.
 func StampInsert(ctx context.Context) (string, error) {
-	tenantID, ok := middleware.GetTenantID(ctx)
+	tenantID, ok := ctxauth.GetTenantID(ctx)
 	if !ok || tenantID == "" {
 		if isDev() {
 			panic("tenantrepo.StampInsert: context has no tenantID")
@@ -97,7 +97,7 @@ func StampInsertM(ctx context.Context, doc bson.M) (bson.M, error) {
 // ScopeAggregate prepends a $match stage filtering by tenantId to an
 // aggregation pipeline. Use for every tenant-scoped aggregation.
 func ScopeAggregate(ctx context.Context, pipeline []bson.M) ([]bson.M, error) {
-	tenantID, ok := middleware.GetTenantID(ctx)
+	tenantID, ok := ctxauth.GetTenantID(ctx)
 	if !ok || tenantID == "" {
 		if isDev() {
 			panic("tenantrepo.ScopeAggregate: context has no tenantID")
@@ -112,10 +112,10 @@ func ScopeAggregate(ctx context.Context, pipeline []bson.M) ([]bson.M, error) {
 	return out, nil
 }
 
-// CurrentTenantID is a thin wrapper over middleware.GetTenantID for callers
+// CurrentTenantID is a thin wrapper over ctxauth.GetTenantID for callers
 // that need the tenantID for reasons other than filtering (logging, audit).
 func CurrentTenantID(ctx context.Context) (string, bool) {
-	return middleware.GetTenantID(ctx)
+	return ctxauth.GetTenantID(ctx)
 }
 
 // CurrentTenantKind returns the tier ("internal" | "external") of the
@@ -124,7 +124,7 @@ func CurrentTenantID(ctx context.Context) (string, bool) {
 // dispatch on tier — e.g. FatturaPA emission must be internal-only — read
 // this alongside CurrentTenantID.
 func CurrentTenantKind(ctx context.Context) string {
-	return middleware.TenantKindFromContext(ctx)
+	return ctxauth.TenantKindFromContext(ctx)
 }
 
 // RequireInternalTenant returns an error (and panics in dev) when the
